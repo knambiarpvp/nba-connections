@@ -762,7 +762,8 @@
             document.querySelectorAll('.tile').forEach(t => {
                 t.style.pointerEvents = busy ? 'none' : '';
             });
-            document.getElementById('btn-submit').disabled = busy || true; // always disable during request
+            document.getElementById('btn-submit').disabled = busy;
+            if (!busy) updateButtons();
         }
 
         async function handleCorrectGuess(group, guessedNames) {
