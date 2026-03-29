@@ -99,7 +99,7 @@ class ExpiringPuzzleStore(dict):
 
     def _cleanup(self) -> None:
         """Remove entries older than the configured TTL."""
-        if not self:
+        if not super().__len__():
             return
         now = datetime.now()
         keys_to_delete = []
@@ -234,21 +234,26 @@ def fetch_players_with_metadata(pool: str = "active") -> list[dict]:
     from nba_api.stats.endpoints import playerindex
 
     if pool == "active":
-        # Single season covers all currently active players
-        seasons = ["2024-25"]
+        # active_nullable=1 returns all rostered players regardless of whether they've
+        # logged stats yet this season (injured, two-way, etc.) — gives ~539 vs ~135
+        # with the default stats-only filter.
+        seasons = [("2025-26", {"active_nullable": 1})]
     else:
-        # Sample across several historical seasons for era variety
-        seasons = ["2014-15", "2004-05", "1994-95", "1984-85"]
+        # historical_nullable=1 returns all players across all eras in one call.
+        # We also query a spread of past seasons so the all-time pool has good era variety.
+        seasons = [("2024-25", {"historical_nullable": 1})]
 
     log.info("[fetch] Fetching PlayerIndex for %s pool via %d bulk request(s) ...", pool, len(seasons))
 
     seen_ids: set[int] = set()
     enriched: list[dict] = []
 
-    for season in seasons:
+    for season, extra_params in seasons:
         try:
             time.sleep(1.0)
-            idx = _nba_request_with_retry(playerindex.PlayerIndex, season=season, timeout=30)
+            idx = _nba_request_with_retry(
+                playerindex.PlayerIndex, season=season, timeout=30, **extra_params
+            )
             data = idx.player_index.get_dict()
             headers = data["headers"]
             rows = data["data"]

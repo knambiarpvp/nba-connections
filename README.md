@@ -42,7 +42,7 @@ pip install -r requirements.txt
 
 ### 4. Configure your API key
 
-Copy the free Google Gemini API key you generated from [Google AI Studio](https://aistudio.google.com/app/apikey) into the .env file.
+Create a .env file at the root of this repository and copy the free Google Gemini API key you generated from [Google AI Studio](https://aistudio.google.com/app/apikey) into the .env file.
 
 ```
 # Get your free Gemini API key at https://aistudio.google.com/app/apikey
