@@ -40,8 +40,8 @@ def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "your_gemini_api_key_here":
         raise RuntimeError(
-            "GEMINI_API_KEY is not set. Copy .env.example to .env and add your key "
-            "from https://aistudio.google.com/app/apikey"
+            "GEMINI_API_KEY is not set. Set GEMINI_API_KEY in your environment or "
+            ".env file with a key from https://aistudio.google.com/app/apikey"
         )
     from google import genai  # lazy import so startup works without key
     return genai.Client(api_key=api_key)
