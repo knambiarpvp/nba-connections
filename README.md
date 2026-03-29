@@ -92,8 +92,7 @@ nba-connections/
 ├── templates/
 │   └── index.html          # Single-page frontend (HTML + CSS + JS, no build tools)
 ├── requirements.txt
-├── .env.example            # API key template
-├── .env                    # Your actual API key (gitignored)
+├── .env                    # Your API key (create this file; gitignored)
 ├── .gitignore
 └── players_cache.json      # Auto-generated player data cache (gitignored)
 ```
