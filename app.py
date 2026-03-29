@@ -82,8 +82,88 @@ class PuzzleResponse(BaseModel):
 # In-memory puzzle store  { puzzle_id: puzzle_data_dict }
 # ─────────────────────────────────────────────────────────────────────────────
 
-_puzzles: dict[str, dict] = {}
+PUZZLE_TTL_MINUTES = 60
 
+
+class ExpiringPuzzleStore(dict):
+    """
+    Dict-like store that automatically expires puzzles older than PUZZLE_TTL_MINUTES.
+
+    Internally stores each value as {"value": puzzle_dict, "created_at": datetime}.
+    Public API remains dict[str, dict]-like: reads/writes use only the puzzle_dict.
+    """
+
+    def __init__(self, *args, ttl_minutes: int = PUZZLE_TTL_MINUTES, **kwargs):
+        self.ttl = timedelta(minutes=ttl_minutes)
+        super().__init__(*args, **kwargs)
+
+    def _cleanup(self) -> None:
+        """Remove entries older than the configured TTL."""
+        if not self:
+            return
+        now = datetime.now()
+        keys_to_delete = []
+        for key, wrapped in super().items():
+            created_at = wrapped.get("created_at")
+            if not isinstance(created_at, datetime):
+                continue
+            if now - created_at > self.ttl:
+                keys_to_delete.append(key)
+        for key in keys_to_delete:
+            super().pop(key, None)
+
+    def __setitem__(self, key, value) -> None:
+        self._cleanup()
+        wrapped = {"value": value, "created_at": datetime.now()}
+        super().__setitem__(key, wrapped)
+
+    def __getitem__(self, key):
+        self._cleanup()
+        wrapped = super().__getitem__(key)
+        return wrapped.get("value")
+
+    def get(self, key, default=None):
+        self._cleanup()
+        wrapped = super().get(key)
+        if wrapped is None:
+            return default
+        return wrapped.get("value", default)
+
+    def __contains__(self, key) -> bool:
+        self._cleanup()
+        return super().__contains__(key)
+
+    def items(self):
+        self._cleanup()
+        for key, wrapped in super().items():
+            yield key, wrapped.get("value")
+
+    def values(self):
+        self._cleanup()
+        for wrapped in super().values():
+            yield wrapped.get("value")
+
+    def keys(self):
+        self._cleanup()
+        return super().keys()
+
+    def pop(self, key, default=None):
+        self._cleanup()
+        wrapped = super().pop(key, None)
+        if wrapped is None:
+            return default
+        return wrapped.get("value", default)
+
+    def __iter__(self):
+        self._cleanup()
+        return super().__iter__()
+
+    def __len__(self) -> int:
+        self._cleanup()
+        return super().__len__()
+
+
+_puzzles: dict[str, dict] = ExpiringPuzzleStore(ttl_minutes=PUZZLE_TTL_MINUTES)
 DIFFICULTY_COLORS = {1: "yellow", 2: "green", 3: "blue", 4: "purple"}
 DIFFICULTY_HEX = {1: "#f9df6d", 2: "#a0c35a", 3: "#b0c4ef", 4: "#ba81c5"}
 
