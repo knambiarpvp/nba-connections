@@ -240,7 +240,6 @@ def fetch_players_with_metadata(pool: str = "active") -> list[dict]:
         seasons = [("2025-26", {"active_nullable": 1})]
     else:
         # historical_nullable=1 returns all players across all eras in one call.
-        # We also query a spread of past seasons so the all-time pool has good era variety.
         seasons = [("2024-25", {"historical_nullable": 1})]
 
     log.info("[fetch] Fetching PlayerIndex for %s pool via %d bulk request(s) ...", pool, len(seasons))
