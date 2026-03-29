@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NBA Connections</title>
+    <style>
+        /* ── Reset & base ─────────────────────────────────────────────────── */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #f9f9f9;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* ── Header ───────────────────────────────────────────────────────── */
+        header {
+            width: 100%;
+            max-width: 640px;
+            padding: 24px 16px 8px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            color: #111;
+        }
+
+        header p.subtitle {
+            font-size: 0.9rem;
+            color: #555;
+            margin-top: 4px;
+        }
+
+        /* ── Main container ───────────────────────────────────────────────── */
+        main {
+            width: 100%;
+            max-width: 640px;
+            padding: 20px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        /* ── Start / controls card ────────────────────────────────────────── */
+        #controls {
+            width: 100%;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #controls p {
+            font-size: 0.875rem;
+            color: #555;
+            text-align: center;
+        }
+
+        /* Pool toggle */
+        .toggle-group {
+            display: flex;
+            border: 2px solid #111;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .toggle-group button {
+            flex: 1;
+            padding: 8px 20px;
+            border: none;
+            background: #fff;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            color: #111;
+        }
+
+        .toggle-group button.active {
+            background: #111;
+            color: #fff;
+        }
+
+        .toggle-group button:not(:last-child) {
+            border-right: 2px solid #111;
+        }
+
+        /* Generate button */
+        #btn-generate {
+            padding: 12px 32px;
+            background: #111;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            min-width: 180px;
+        }
+
+        #btn-generate:hover:not(:disabled) {
+            opacity: 0.85;
+        }
+
+        #btn-generate:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        #btn-generate:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ── Loading spinner ──────────────────────────────────────────────── */
+        #loading {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ddd;
+            border-top-color: #111;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #loading p {
+            font-size: 0.875rem;
+            color: #555;
+        }
+
+        /* ── Solved group rows ────────────────────────────────────────────── */
+        #solved-rows {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .solved-row {
+            width: 100%;
+            border-radius: 10px;
+            padding: 14px 16px;
+            text-align: center;
+            animation: slideDown 0.4s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .solved-row .group-category {
+            font-weight: 800;
+            font-size: 0.95rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #111;
+        }
+
+        .solved-row .group-players {
+            font-size: 0.82rem;
+            color: #333;
+            margin-top: 4px;
+        }
+
+        .solved-row .group-explanation {
+            font-size: 0.78rem;
+            color: #555;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        /* ── Tile grid ────────────────────────────────────────────────────── */
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            width: 100%;
+        }
+
+        .tile {
+            aspect-ratio: 1 / 0.72;
+            background: #e8e8e8;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 6px;
+            font-size: clamp(0.6rem, 2vw, 0.82rem);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.12s, transform 0.1s;
+            line-height: 1.2;
+            color: #111;
+        }
+
+        .tile:hover {
+            background: #d4d4d4;
+        }
+
+        .tile.selected {
+            background: #3d3d3d;
+            color: #fff;
+        }
+
+        .tile.shake {
+            animation: shake 0.45s ease;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            15% {
+                transform: translateX(-6px);
+            }
+
+            30% {
+                transform: translateX(6px);
+            }
+
+            45% {
+                transform: translateX(-5px);
+            }
+
+            60% {
+                transform: translateX(5px);
+            }
+
+            75% {
+                transform: translateX(-3px);
+            }
+
+            90% {
+                transform: translateX(3px);
+            }
+        }
+
+        .tile.bounce {
+            animation: bounce 0.5s ease;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            30% {
+                transform: translateY(-10px);
+            }
+
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        /* ── Status message ───────────────────────────────────────────────── */
+        #status-msg {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #111;
+            min-height: 22px;
+            text-align: center;
+            transition: opacity 0.3s;
+        }
+
+        #status-msg.fade-out {
+            opacity: 0;
+        }
+
+        /* ── Mistakes indicator ───────────────────────────────────────────── */
+        #mistakes-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            color: #444;
+        }
+
+        #mistakes-dots {
+            display: flex;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #555;
+            transition: background 0.3s, transform 0.3s;
+        }
+
+        .dot.lost {
+            background: #ccc;
+            transform: scale(0.7);
+        }
+
+        /* ── Action buttons row ───────────────────────────────────────────── */
+        #action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 10px 18px;
+            border: 2px solid #111;
+            border-radius: 30px;
+            background: #fff;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, opacity 0.2s;
+        }
+
+        .action-btn:hover:not(:disabled) {
+            background: #111;
+            color: #fff;
+        }
+
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #aaa;
+        }
+
+        #btn-submit {
+            background: #111;
+            color: #fff;
+            border-color: #111;
+        }
+
+        #btn-submit:hover:not(:disabled) {
+            background: #333;
+        }
+
+        #btn-submit:disabled {
+            background: #ccc;
+            border-color: #ccc;
+            color: #888;
+        }
+
+        /* ── End screen ───────────────────────────────────────────────────── */
+        #end-screen {
+            display: none;
+            width: 100%;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #end-screen h2 {
+            font-size: 1.5rem;
+            font-weight: 900;
+        }
+
+        #result-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .result-row {
+            display: flex;
+            gap: 4px;
+        }
+
+        .result-square {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+        }
+
+        #btn-new-game {
+            padding: 12px 32px;
+            background: #111;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        #btn-new-game:hover {
+            opacity: 0.85;
+        }
+
+        /* ── Error banner ─────────────────────────────────────────────────── */
+        #error-banner {
+            display: none;
+            width: 100%;
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            color: #b91c1c;
+        }
+
+        /* ── Game area wrapper (hidden until puzzle loaded) ───────────────── */
+        #game-area {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* ── Responsive ───────────────────────────────────────────────────── */
+        @media (max-width: 440px) {
+            header h1 {
+                font-size: 1.5rem;
+            }
+
+            .tile {
+                font-size: 0.65rem;
+            }
+
+            .action-btn {
+                padding: 8px 12px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>🏀 NBA Connections</h1>
+        <p class="subtitle">Group 16 NBA players into 4 categories. 4 mistakes allowed.</p>
+    </header>
+
+    <main>
+
+        <!-- Error banner -->
+        <div id="error-banner"></div>
+
+        <!-- Controls card -->
+        <div id="controls">
+            <p>Choose your player pool, then generate a puzzle.</p>
+            <div class="toggle-group">
+                <button id="btn-pool-active" class="active" onclick="setPool('active')">Active Players</button>
+                <button id="btn-pool-alltime" onclick="setPool('all_time')">All-Time Legends</button>
+            </div>
+            <button id="btn-generate" onclick="generatePuzzle()">🎲 New Puzzle</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading">
+            <div class="spinner"></div>
+            <p id="loading-msg">Fetching players & generating puzzle…</p>
+        </div>
+
+        <!-- Game area -->
+        <div id="game-area">
+
+            <!-- Solved group rows appear here -->
+            <div id="solved-rows"></div>
+
+            <!-- 4×4 tile grid -->
+            <div id="grid"></div>
+
+            <!-- Status message -->
+            <div id="status-msg"></div>
+
+            <!-- Mistake dots -->
+            <div id="mistakes-area">
+                <span>Mistakes remaining:</span>
+                <div id="mistakes-dots">
+                    <div class="dot" id="dot-0"></div>
+                    <div class="dot" id="dot-1"></div>
+                    <div class="dot" id="dot-2"></div>
+                    <div class="dot" id="dot-3"></div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div id="action-buttons">
+                <button class="action-btn" id="btn-shuffle" onclick="shuffleTiles()">Shuffle</button>
+                <button class="action-btn" id="btn-deselect" onclick="deselectAll()" disabled>Deselect All</button>
+                <button class="action-btn" id="btn-submit" onclick="submitGuess()" disabled>Submit</button>
+            </div>
+
+        </div>
+
+        <!-- End screen -->
+        <div id="end-screen">
+            <h2 id="end-title"></h2>
+            <p id="end-subtitle"></p>
+            <div id="result-grid"></div>
+            <button id="btn-new-game" onclick="resetToStart()">Play Again</button>
+        </div>
+
+    </main>
+
+    <script>
+        // ────────────────────────────────────────────────────────────────────────────
+        // State
+        // ────────────────────────────────────────────────────────────────────────────
+        let puzzleId = null;
+        let playerPool = 'active';
+        let tiles = [];           // current tile order (array of player name strings)
+        let selected = new Set(); // currently selected player names
+        let mistakes = 0;
+        const MAX_MISTAKES = 4;
+        let gameOver = false;
+        let solvedGroups = [];    // { category, color, hex, difficulty, explanation, players }
+        let guessHistory = [];    // rows of { color, hex } for result grid
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // UI helpers
+        // ────────────────────────────────────────────────────────────────────────────
+        function setPool(pool) {
+            playerPool = pool;
+            document.getElementById('btn-pool-active').classList.toggle('active', pool === 'active');
+            document.getElementById('btn-pool-alltime').classList.toggle('active', pool === 'all_time');
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-banner');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+
+        function clearError() {
+            document.getElementById('error-banner').style.display = 'none';
+        }
+
+        function setStatus(msg, autoClear = true) {
+            const el = document.getElementById('status-msg');
+            el.classList.remove('fade-out');
+            el.textContent = msg;
+            if (autoClear && msg) {
+                setTimeout(() => { el.classList.add('fade-out'); }, 1800);
+                setTimeout(() => { if (el.textContent === msg) el.textContent = ''; el.classList.remove('fade-out'); }, 2200);
+            }
+        }
+
+        function updateMistakeDots() {
+            for (let i = 0; i < MAX_MISTAKES; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                dot.classList.toggle('lost', i >= (MAX_MISTAKES - mistakes));
+            }
+        }
+
+        function updateButtons() {
+            const count = selected.size;
+            document.getElementById('btn-submit').disabled = count !== 4 || gameOver;
+            document.getElementById('btn-deselect').disabled = count === 0 || gameOver;
+            document.getElementById('btn-shuffle').disabled = gameOver;
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Puzzle generation
+        // ────────────────────────────────────────────────────────────────────────────
+        async function generatePuzzle() {
+            clearError();
+            document.getElementById('btn-generate').disabled = true;
+            document.getElementById('controls').style.opacity = '0.5';
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('game-area').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'none';
+
+            // Loading messages to keep the user entertained during the wait
+            const msgs = [
+                'Fetching player rosters from NBA stats…',
+                'Gathering player metadata…',
+                'Asking Gemini to find the hidden connections…',
+                'Validating puzzle groups…',
+                'Almost ready…',
+            ];
+            let msgIdx = 0;
+            const msgEl = document.getElementById('loading-msg');
+            const msgTimer = setInterval(() => {
+                msgIdx = (msgIdx + 1) % msgs.length;
+                msgEl.textContent = msgs[msgIdx];
+            }, 3000);
+
+            try {
+                const resp = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ player_pool: playerPool }),
+                });
+                const data = await resp.json();
+
+                if (!resp.ok || data.error) {
+                    throw new Error(data.error || 'Failed to generate puzzle');
+                }
+
+                puzzleId = data.puzzle_id;
+                tiles = data.players; // already shuffled server-side
+
+                // Reset game state
+                selected = new Set();
+                mistakes = 0;
+                gameOver = false;
+                solvedGroups = [];
+                guessHistory = [];
+                document.getElementById('solved-rows').innerHTML = '';
+
+                updateMistakeDots();
+                renderGrid();
+                updateButtons();
+
+                document.getElementById('game-area').style.display = 'flex';
+
+            } catch (err) {
+                showError(`Error: ${err.message}`);
+            } finally {
+                clearInterval(msgTimer);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('controls').style.opacity = '1';
+                document.getElementById('btn-generate').disabled = false;
+            }
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Grid rendering
+        // ────────────────────────────────────────────────────────────────────────────
+        function renderGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
+
+            tiles.forEach(name => {
+                const div = document.createElement('div');
+                div.className = 'tile' + (selected.has(name) ? ' selected' : '');
+                div.textContent = name;
+                div.dataset.name = name;
+                div.addEventListener('click', () => toggleTile(name));
+                grid.appendChild(div);
+            });
+        }
+
+        function getTileEl(name) {
+            return document.querySelector(`.tile[data-name="${CSS.escape(name)}"]`);
+        }
+
+        function toggleTile(name) {
+            if (gameOver) return;
+            if (selected.has(name)) {
+                selected.delete(name);
+                getTileEl(name)?.classList.remove('selected');
+            } else {
+                if (selected.size >= 4) return; // max 4 selections
+                selected.add(name);
+                getTileEl(name)?.classList.add('selected');
+            }
+            updateButtons();
+        }
+
+        function deselectAll() {
+            selected.forEach(name => getTileEl(name)?.classList.remove('selected'));
+            selected.clear();
+            updateButtons();
+        }
+
+        function shuffleTiles() {
+            if (gameOver) return;
+            for (let i = tiles.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+            }
+            renderGrid();
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Submit guess
+        // ────────────────────────────────────────────────────────────────────────────
+        async function submitGuess() {
+            if (selected.size !== 4 || gameOver) return;
+            setAllTilesCursorBusy(true);
+            const guess = [...selected];
+
+            try {
+                const resp = await fetch('/api/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ puzzle_id: puzzleId, selected: guess }),
+                });
+                const data = await resp.json();
+
+                if (data.error === 'already_solved') {
+                    setStatus('Already solved! Pick different players.');
+                    return;
+                }
+                if (!resp.ok || data.error) {
+                    setStatus(data.error || 'Something went wrong');
+                    return;
+                }
+
+                if (data.correct) {
+                    await handleCorrectGuess(data.group, guess);
+                } else {
+                    await handleWrongGuess(data.one_away, guess);
+                }
+            } catch (err) {
+                setStatus('Network error, please try again.');
+            } finally {
+                setAllTilesCursorBusy(false);
+            }
+        }
+
+        function setAllTilesCursorBusy(busy) {
+            document.querySelectorAll('.tile').forEach(t => {
+                t.style.pointerEvents = busy ? 'none' : '';
+            });
+            document.getElementById('btn-submit').disabled = busy || true; // always disable during request
+        }
+
+        async function handleCorrectGuess(group, guessedNames) {
+            // Bounce selected tiles
+            await animateTiles(guessedNames, 'bounce');
+
+            // Add to solved rows
+            solvedGroups.push(group);
+            guessHistory.push({ color: group.color, hex: group.hex });
+            addSolvedRow(group);
+
+            // Remove solved players from tiles array
+            tiles = tiles.filter(n => !guessedNames.includes(n));
+            selected.clear();
+            renderGrid();
+            updateButtons();
+
+            setStatus(`✓ ${group.category}`, false);
+
+            // Check win
+            if (tiles.length === 0) {
+                await delay(600);
+                showEndScreen(true);
+            }
+        }
+
+        async function handleWrongGuess(oneAway, guessedNames) {
+            mistakes++;
+            updateMistakeDots();
+            await animateTiles(guessedNames, 'shake');
+
+            guessHistory.push({ color: 'miss', hex: '#e0e0e0' });
+
+            if (oneAway) {
+                setStatus('One away…');
+            } else {
+                setStatus('Not quite!');
+            }
+
+            deselectAll();
+
+            if (mistakes >= MAX_MISTAKES) {
+                await delay(400);
+                await revealRemaining();
+                await delay(400);
+                showEndScreen(false);
+            } else {
+                updateButtons();
+            }
+        }
+
+        function addSolvedRow(group) {
+            const row = document.createElement('div');
+            row.className = 'solved-row';
+            row.style.background = group.hex;
+            row.innerHTML = `
+    <div class="group-category">${escapeHtml(group.category)}</div>
+    <div class="group-players">${escapeHtml(group.players.join(' · '))}</div>
+    <div class="group-explanation">${escapeHtml(group.explanation)}</div>
+  `;
+            document.getElementById('solved-rows').appendChild(row);
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Game over — reveal remaining groups
+        // ────────────────────────────────────────────────────────────────────────────
+        async function revealRemaining() {
+            try {
+                const resp = await fetch('/api/reveal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ puzzle_id: puzzleId }),
+                });
+                const data = await resp.json();
+                if (data.remaining_groups) {
+                    for (const group of data.remaining_groups) {
+                        addSolvedRow(group);
+                        await delay(350);
+                    }
+                }
+            } catch (e) {
+                // non-fatal
+            }
+            tiles = [];
+            renderGrid();
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // End screen
+        // ────────────────────────────────────────────────────────────────────────────
+        function showEndScreen(won) {
+            gameOver = true;
+            updateButtons();
+            document.getElementById('game-area').style.display = 'none';
+
+            const screen = document.getElementById('end-screen');
+            document.getElementById('end-title').textContent = won ? '🏆 You Won!' : '😢 Better Luck Next Time';
+            document.getElementById('end-subtitle').textContent = won
+                ? `Solved with ${mistakes} mistake${mistakes !== 1 ? 's' : ''}!`
+                : 'Here\'s how you did:';
+
+            // Result grid: one row per guess attempt (correct row = 4 same-color squares; miss = 4 grey)
+            const grid = document.getElementById('result-grid');
+            grid.innerHTML = '';
+            guessHistory.forEach(entry => {
+                const row = document.createElement('div');
+                row.className = 'result-row';
+                for (let i = 0; i < 4; i++) {
+                    const sq = document.createElement('div');
+                    sq.className = 'result-square';
+                    sq.style.background = entry.hex;
+                    row.appendChild(sq);
+                }
+                grid.appendChild(row);
+            });
+
+            screen.style.display = 'flex';
+        }
+
+        function resetToStart() {
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('game-area').style.display = 'none';
+            document.getElementById('solved-rows').innerHTML = '';
+            tiles = [];
+            selected.clear();
+            puzzleId = null;
+            gameOver = false;
+            mistakes = 0;
+            updateMistakeDots();
+            setStatus('', false);
+        }
+
+        // ────────────────────────────────────────────────────────────────────────────
+        // Animations & utilities
+        // ────────────────────────────────────────────────────────────────────────────
+        function animateTiles(names, className) {
+            return new Promise(resolve => {
+                const els = names.map(n => getTileEl(n)).filter(Boolean);
+                els.forEach(el => el.classList.add(className));
+                setTimeout(() => {
+                    els.forEach(el => el.classList.remove(className));
+                    resolve();
+                }, 500);
+            });
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+    </script>
+
+</body>
+
+</html>
