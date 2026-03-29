@@ -622,6 +622,10 @@ def api_validate():
     if len(selected) != 4:
         return jsonify({"error": "Must select exactly 4 players"}), 400
 
+    # Enforce that all 4 selections are distinct (case-insensitive)
+    normalized_selected = [str(name).lower() for name in selected]
+    if len(set(normalized_selected)) != len(normalized_selected):
+        return jsonify({"error": "Must select 4 distinct players"}), 400
     # Determine which group each selected player belongs to
     group_indices = []
     for name in selected:
