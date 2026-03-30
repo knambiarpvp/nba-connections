@@ -16,7 +16,7 @@ if exist "..\..\venv\Scripts\python.exe" (
 if errorlevel 1 (
     echo ERROR: Python not found. Install Python 3.10+ and run:
     echo   python -m venv venv
-    echo   venv\Scripts\pip install -r src\build\requirements.txt
+    echo   venv\Scripts\pip install -r src\compile\requirements.txt
     pause
     exit /b 1
 )
