@@ -49,13 +49,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: src/build/requirements.txt
+          cache-dependency-path: src/compile/requirements.txt
 
       - name: Install dependencies + PyInstaller
-        run: pip install -r src/build/requirements.txt pyinstaller
+        run: pip install -r src/compile/requirements.txt pyinstaller
 
       - name: Build executable
-        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/build/nba_connections.spec
+        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/compile/nba_connections.spec
 
       - name: Zip artifact
         shell: pwsh
@@ -81,13 +81,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: src/build/requirements.txt
+          cache-dependency-path: src/compile/requirements.txt
 
       - name: Install dependencies + PyInstaller
-        run: pip install -r src/build/requirements.txt pyinstaller
+        run: pip install -r src/compile/requirements.txt pyinstaller
 
       - name: Build executable
-        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/build/nba_connections.spec
+        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/compile/nba_connections.spec
 
       - name: Zip artifact
         run: zip -r nba-connections-macos-arm64.zip dist/nba-connections/
@@ -112,13 +112,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: src/build/requirements.txt
+          cache-dependency-path: src/compile/requirements.txt
 
       - name: Install dependencies + PyInstaller
-        run: pip install -r src/build/requirements.txt pyinstaller
+        run: pip install -r src/compile/requirements.txt pyinstaller
 
       - name: Build executable
-        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/build/nba_connections.spec
+        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/compile/nba_connections.spec
 
       - name: Zip artifact
         run: zip -r nba-connections-macos-x86_64.zip dist/nba-connections/
@@ -134,7 +134,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   release:
     name: Publish release
-    needs: [version, build-windows, build-macos-arm64, build-macos-x86]
+    needs: [version, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download Windows artifact
@@ -142,15 +142,10 @@ jobs:
         with:
           name: windows-zip
 
-      - name: Download macOS arm64 artifact
+      - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
-          name: macos-arm64-zip
-
-      - name: Download macOS x86_64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-x86-zip
+          name: macos-zip
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -160,5 +155,4 @@ jobs:
           generate_release_notes: true
           files: |
             nba-connections-windows.zip
-            nba-connections-macos-arm64.zip
-            nba-connections-macos-x86_64.zip
+            nba-connections-macos.zip

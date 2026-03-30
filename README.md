@@ -24,11 +24,10 @@ Create a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 Go to the [Releases page](../../releases/latest) and download the zip for your platform:
 
-| File                               | Platform                          |
-| ---------------------------------- | --------------------------------- |
-| `nba-connections-windows.zip`      | Windows x86_64                    |
-| `nba-connections-macos-arm64.zip`  | macOS Apple Silicon (M1/M2/M3/M4) |
-| `nba-connections-macos-x86_64.zip` | macOS Intel                       |
+| File                          | Platform                                |
+| ----------------------------- | --------------------------------------- |
+| `nba-connections-windows.zip` | Windows x86_64                          |
+| `nba-connections-macos.zip`   | macOS universal (Apple Silicon + Intel) |
 
 Unzip, then run the executable inside the folder.
 
@@ -47,6 +46,8 @@ Then run:
 ```bash
 ./nba-connections/nba-connections [GEMINI_API_KEY]
 ```
+
+The `nba-connections-macos.zip` is a **universal2** binary and runs natively on both Apple Silicon and Intel Macs.
 
 The executable will prompt for your Gemini API key if not provided, save it to `.env` next to the executable, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
@@ -86,7 +87,7 @@ nba-connections/
 │   │   ├── start.bat       # Windows launcher
 │   │   ├── start.sh        # macOS/Linux launcher
 │   │   └── start.command   # macOS Finder double-click launcher
-│   ├── build/
+│   ├── compile/
 │   │   ├── build.bat       # Windows build script (produces standalone .exe)
 │   │   ├── build.sh        # macOS/Linux build script
 │   │   ├── nba_connections.spec  # PyInstaller spec file
@@ -119,8 +120,8 @@ nba-connections/
 Every merge to `main` triggers the [Build and Release](.github/workflows/release.yml) GitHub Actions workflow, which:
 
 1. Determines the next [semantic version](https://semver.org) from commit messages using [Conventional Commits](https://www.conventionalcommits.org)
-2. Builds executables in parallel on Windows, macOS arm64, and macOS x86_64 runners
-3. Creates a [GitHub Release](../../releases) with the new tag and attaches all three zips
+2. Builds executables in parallel on Windows (`windows-latest`) and macOS (`macos-latest`, universal2)
+3. Creates a [GitHub Release](../../releases) with the new tag and attaches both zips
 
 **Version bump rules (commit message prefix):**
 
@@ -144,15 +145,15 @@ Use [PyInstaller](https://pyinstaller.org) to bundle Python and all dependencies
 
 ### Build
 
-**Windows** — double-click `src\build\build.bat`, or from a terminal:
+**Windows** — double-click `src\compile\build.bat`, or from a terminal:
 ```bat
-src\build\build.bat
+src\compile\build.bat
 ```
 
 **macOS / Linux:**
 ```bash
-chmod +x src/build/build.sh
-src/build/build.sh
+chmod +x src/compile/build.sh
+src/compile/build.sh
 ```
 
 The build output is placed in `dist/nba-connections/`. To distribute, zip the **entire `dist/nba-connections/` folder** — the executable plus its support files must stay together.
@@ -173,13 +174,12 @@ The executable behaves identically to `python start.py`: it prompts for your Gem
 
 ### macOS notes
 
-- **Build platform must match target platform** — PyInstaller cannot cross-compile. Run `build.sh` on a Mac to get a macOS binary; run `build.bat` on Windows for a Windows binary.
-- **CPU architecture** — the binary only runs natively on the architecture it was built on (Intel x86_64 or Apple Silicon arm64). Build separately for each, or pass `--target-arch universal2` in the spec for a combined binary (requires Apple Silicon + Rosetta).
 - **Gatekeeper warning** — macOS will block unsigned executables downloaded from the internet. Before running, clear the quarantine flag on the unzipped folder:
   ```bash
-  xattr -cr dist/nba-connections/
+  xattr -cr nba-connections/
   ```
   Alternatively, right-click the executable in Finder and choose **Open**.
+- **Universal binary** — the macOS release is built as `universal2`, running natively on both Apple Silicon (arm64) and Intel (x86_64) Macs from a single download.
 
 > **Note:** The first build can take several minutes and produces a large folder (~150–300 MB) because it bundles a full Python runtime. Subsequent builds are faster due to caching.
 
@@ -205,7 +205,7 @@ source venv/bin/activate
 ### 2. Install dependencies
 
 ```bash
-pip install -r src/build/requirements.txt
+pip install -r src/compile/requirements.txt
 ```
 
 ### 3. Configure your API key

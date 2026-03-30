@@ -32,7 +32,7 @@ if [ ! -f "$PROJECT_ROOT/venv/bin/python" ]; then
         echo "Creating virtual environment..."
         $PYTHON -m venv "$PROJECT_ROOT/venv" || { echo "ERROR: Failed to create venv."; exit 1; }
         echo "Installing dependencies..."
-        "$PROJECT_ROOT/venv/bin/pip" install -r ../build/requirements.txt || { echo "ERROR: pip install failed."; exit 1; }
+        "$PROJECT_ROOT/venv/bin/pip" install -r ../compile/requirements.txt || { echo "ERROR: pip install failed."; exit 1; }
         PYTHON="$PROJECT_ROOT/venv/bin/python"
         echo ""
     else
