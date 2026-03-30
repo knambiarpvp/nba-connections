@@ -1,6 +1,8 @@
 name: Build and Release
 
-# Runs on every merge / push to main.
+# On pull_request (opened / updated): runs the build jobs only (smoke-test).
+# On push to main: also bumps the semver tag and publishes a GitHub Release.
+#
 # Conventional commit prefixes control the version bump:
 #   feat:            → minor  (1.x.0)
 #   fix: / chore:    → patch  (1.0.x)
@@ -9,6 +11,8 @@ name: Build and Release
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 permissions:
@@ -20,6 +24,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   version:
     name: Determine version
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       new_tag: ${{ steps.tag.outputs.new_tag }}
@@ -40,7 +45,6 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   build-windows:
     name: Build (Windows x86_64)
-    needs: version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +76,6 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   build-macos:
     name: Build (macOS arm64)
-    needs: version
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -103,6 +106,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────
   release:
     name: Publish release
+    if: github.event_name == 'push'
     needs: [version, build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
