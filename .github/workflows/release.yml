@@ -90,7 +90,7 @@ jobs:
         run: pip install -r src/compile/requirements.txt pyinstaller
 
       - name: Build universal2 executable
-        run: python -m PyInstaller --clean --noconfirm --target-arch universal2 --distpath dist --workpath build src/compile/nba_connections.spec
+        run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/compile/nba_connections.spec
 
       - name: Zip artifact
         run: zip -r nba-connections-macos.zip dist/nba-connections/
