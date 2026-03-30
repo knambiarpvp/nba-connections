@@ -24,10 +24,10 @@ Create a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 Go to the [Releases page](../../releases/latest) and download the zip for your platform:
 
-| File                          | Platform                                |
-| ----------------------------- | --------------------------------------- |
-| `nba-connections-windows.zip` | Windows x86_64                          |
-| `nba-connections-macos.zip`   | macOS universal (Apple Silicon + Intel) |
+| File                          | Platform                                          |
+| ----------------------------- | ------------------------------------------------- |
+| `nba-connections-windows.zip` | Windows x86_64                                    |
+| `nba-connections-macos.zip`   | macOS arm64 (Apple Silicon + Intel via Rosetta 2) |
 
 Unzip, then run the executable inside the folder.
 
@@ -47,7 +47,7 @@ Then run:
 ./nba-connections/nba-connections [GEMINI_API_KEY]
 ```
 
-The `nba-connections-macos.zip` is a **universal2** binary and runs natively on both Apple Silicon and Intel Macs.
+The `nba-connections-macos.zip` is built for **arm64**. It runs natively on Apple Silicon and automatically via Rosetta 2 on Intel Macs (no extra steps needed).
 
 The executable will prompt for your Gemini API key if not provided, save it to `.env` next to the executable, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
@@ -179,7 +179,7 @@ The executable behaves identically to `python start.py`: it prompts for your Gem
   xattr -cr nba-connections/
   ```
   Alternatively, right-click the executable in Finder and choose **Open**.
-- **Universal binary** — the macOS release is built as `universal2`, running natively on both Apple Silicon (arm64) and Intel (x86_64) Macs from a single download.
+- **Intel Macs** — the binary is arm64 and runs via Rosetta 2, which is installed by default on all Apple Silicon Macs. Intel Mac users can run it without any changes.
 
 > **Note:** The first build can take several minutes and produces a large folder (~150–300 MB) because it bundles a full Python runtime. Subsequent builds are faster due to caching.
 

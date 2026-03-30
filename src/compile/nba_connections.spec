@@ -55,7 +55,7 @@ exe = EXE(
     console=True,            # Keep console window (needed for API key prompt)
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch="universal2",
+    target_arch=None,         # arm64 (native); runs on Intel via Rosetta 2
     codesign_identity=None,
     entitlements_file=None,
 )
