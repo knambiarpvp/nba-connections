@@ -24,7 +24,7 @@ datas += collect_data_files("nba_api")
 hidden_imports = collect_submodules("nba_api")
 
 a = Analysis(
-    [os.path.join(_SRC, "start", "start.py")],
+    [os.path.join(_SRC, "start.py")],
     pathex=[],
     binaries=[],
     datas=datas,

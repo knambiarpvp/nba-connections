@@ -21,14 +21,14 @@ from pathlib import Path
 
 
 def _exe_dir() -> Path:
-    """Directory that contains the executable (frozen) or the src/ dir (dev)."""
+    """Directory that contains the executable (frozen) or this file (dev)."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
-    return Path(__file__).parent.parent  # src/start/ -> src/
+    return Path(__file__).parent  # src/
 
 
 ENV_FILE = _exe_dir() / ".env"
-APP_FILE = Path(__file__).parent.parent / "app.py"
+APP_FILE = Path(__file__).parent / "app.py"
 
 
 def write_env(api_key: str) -> None:
