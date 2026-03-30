@@ -68,10 +68,10 @@ jobs:
           retention-days: 1
 
   # ─────────────────────────────────────────────────────────────────────────
-  # 2b. Build — macOS universal2 (Apple Silicon + Intel in one binary)
-  # ─────────────────────────────────────────────────────────────────────────
+  # 2b. Build — macOS arm64 (Apple Silicon; Intel runs via Rosetta 2)
+  # ───────────────────────────────────────────────────────────────────────────
   build-macos:
-    name: Build (macOS universal2)
+    name: Build (macOS arm64)
     needs: version
     runs-on: macos-latest
     steps:
@@ -83,13 +83,10 @@ jobs:
           cache: pip
           cache-dependency-path: src/compile/requirements.txt
 
-      - name: Install Rosetta (required for universal2 builds)
-        run: softwareupdate --install-rosetta --agree-to-license
-
       - name: Install dependencies + PyInstaller
         run: pip install -r src/compile/requirements.txt pyinstaller
 
-      - name: Build universal2 executable
+      - name: Build executable
         run: python -m PyInstaller --clean --noconfirm --distpath dist --workpath build src/compile/nba_connections.spec
 
       - name: Zip artifact
