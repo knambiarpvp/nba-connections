@@ -25,10 +25,10 @@ hidden_imports = collect_submodules("nba_api")
 
 a = Analysis(
     [os.path.join(_SRC, "start", "start.py")],
-    pathex=[],
+    pathex=[_SRC],           # makes app.py importable as 'app' from the bundle
     binaries=[],
     datas=datas,
-    hiddenimports=hidden_imports,
+    hiddenimports=hidden_imports + ["app"],  # 'app' is imported by name at runtime
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
