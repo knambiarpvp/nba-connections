@@ -17,8 +17,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-ENV_FILE = Path(__file__).parent / ".env"
-APP_FILE = Path(__file__).parent / "app.py"
+
+def _exe_dir() -> Path:
+    """Directory that contains the executable (frozen) or the src/ dir (dev)."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent.parent  # src/start/ -> src/
+
+
+ENV_FILE = _exe_dir() / ".env"
+APP_FILE = Path(__file__).parent.parent / "app.py"
 
 
 def write_env(api_key: str) -> None:
@@ -87,21 +95,27 @@ def main() -> None:
     api_key = get_api_key(args.api_key)
     write_env(api_key)
 
+    # Also inject into the current process so the Flask app sees it immediately
+    # (avoids relying on load_dotenv re-reading .env after process start)
+    os.environ["GEMINI_API_KEY"] = api_key
+
     print(f"\n  Starting Flask server on http://{args.host}:{args.port}")
     print("  Press Ctrl+C to stop.\n")
 
-    # Run app.py with the same Python interpreter that's running this script,
-    # passing host/port via environment variables read by Flask.
-    env = os.environ.copy()
-    env["FLASK_RUN_HOST"] = args.host
-    env["FLASK_RUN_PORT"] = str(args.port)
-
     try:
-        subprocess.run(
-            [sys.executable, str(APP_FILE), "--host", args.host, "--port", str(args.port)],
-            env=env,
-            check=False,
-        )
+        if getattr(sys, "frozen", False):
+            # Running as a PyInstaller bundle — import and run Flask directly.
+            # app.py is bundled; we cannot subprocess it as a separate file.
+            from app import app as flask_app  # type: ignore[import]
+            flask_app.run(debug=False, use_reloader=False, host=args.host, port=args.port)
+        else:
+            # Development mode — run app.py as a subprocess.
+            env = os.environ.copy()
+            subprocess.run(
+                [sys.executable, str(APP_FILE), "--host", args.host, "--port", str(args.port)],
+                env=env,
+                check=False,
+            )
     except KeyboardInterrupt:
         print("\n  Server stopped.")
 

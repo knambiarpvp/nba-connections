@@ -1,12 +1,12 @@
 @echo off
 :: NBA Connections — Windows launcher
-:: Double-click this file to start the server.
+:: Run from the src\start\ directory or double-click from there.
 
 cd /d "%~dp0"
 
-:: Use the venv Python if it exists, otherwise fall back to system Python
-if exist "venv\Scripts\python.exe" (
-    set PYTHON=venv\Scripts\python.exe
+:: Use the venv Python (two levels up in project root) if it exists
+if exist "..\..\venv\Scripts\python.exe" (
+    set PYTHON=..\..\venv\Scripts\python.exe
 ) else (
     set PYTHON=python
 )
@@ -16,7 +16,7 @@ if exist "venv\Scripts\python.exe" (
 if errorlevel 1 (
     echo ERROR: Python not found. Install Python 3.10+ and run:
     echo   python -m venv venv
-    echo   venv\Scripts\pip install -r requirements.txt
+    echo   venv\Scripts\pip install -r src\build\requirements.txt
     pause
     exit /b 1
 )
