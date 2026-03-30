@@ -81,9 +81,9 @@ The executable will prompt for your Gemini API key if not provided, save it to `
 nba-connections/
 ├── src/
 │   ├── app.py              # Flask backend — routes, nba_api fetching, Gemini integration
+│   ├── start.py            # Cross-platform launcher (API key prompt, writes .env)
 │   ├── .env                # Your API key (created automatically; gitignored)
 │   ├── start/
-│   │   ├── start.py        # Cross-platform launcher (API key prompt, writes .env)
 │   │   ├── start.bat       # Windows launcher
 │   │   ├── start.sh        # macOS/Linux launcher
 │   │   └── start.command   # macOS Finder double-click launcher
@@ -220,7 +220,7 @@ echo "GEMINI_API_KEY=your_key_here" > src/.env
 ```bash
 python src/app.py                          # default: http://localhost:5000
 python src/app.py --port 8080              # custom port
-python src/start/start.py AIzaSy...yourkey       # via launcher (writes src/.env automatically)
+python src/start.py AIzaSy...yourkey       # via launcher (writes src/.env automatically)
 ```
 
 Or use the shell launchers from the project root:

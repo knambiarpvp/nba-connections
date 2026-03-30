@@ -41,4 +41,4 @@ if [ ! -f "$PROJECT_ROOT/venv/bin/python" ]; then
 fi
 
 # ── Launch ────────────────────────────────────────────────────────────────────
-$PYTHON start.py "$@"
+$PYTHON ../start.py "$@"
