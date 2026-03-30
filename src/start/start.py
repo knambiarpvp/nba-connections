@@ -15,6 +15,8 @@ import getpass
 import os
 import subprocess
 import sys
+import threading
+import webbrowser
 from pathlib import Path
 
 
@@ -102,12 +104,22 @@ def main() -> None:
     print(f"\n  Starting Flask server on http://{args.host}:{args.port}")
     print("  Press Ctrl+C to stop.\n")
 
+    # Open the browser shortly after the server starts.
+    # 1.5 s is enough for Flask to bind the socket before the tab tries to connect.
+    url = f"http://{args.host}:{args.port}"
+    threading.Timer(1.5, webbrowser.open, args=[url]).start()
+
     try:
         if getattr(sys, "frozen", False):
             # Running as a PyInstaller bundle — import and run Flask directly.
             # app.py is bundled; we cannot subprocess it as a separate file.
-            from app import app as flask_app  # type: ignore[import]
-            flask_app.run(debug=False, use_reloader=False, host=args.host, port=args.port)
+            try:
+                from app import app as flask_app  # type: ignore[import]
+                flask_app.run(debug=False, use_reloader=False, host=args.host, port=args.port)
+            except Exception as exc:
+                print(f"\n  ERROR: {exc}", file=sys.stderr)
+                input("\n  Press Enter to close...")
+                sys.exit(1)
         else:
             # Development mode — run app.py as a subprocess.
             env = os.environ.copy()
