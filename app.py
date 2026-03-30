@@ -700,4 +700,11 @@ def api_reveal():
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    import argparse as _argparse
+
+    _parser = _argparse.ArgumentParser(add_help=False)
+    _parser.add_argument("--host", default="127.0.0.1")
+    _parser.add_argument("--port", type=int, default=5000)
+    _args, _ = _parser.parse_known_args()
+
+    app.run(debug=True, host=_args.host, port=_args.port)

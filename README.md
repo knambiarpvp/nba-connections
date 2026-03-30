@@ -16,51 +16,27 @@ A spinoff of the NYT Connections puzzle game that uses 16 NBA players split into
 
 ## Setup
 
-### 1. Prerequisites
+### 1. Get a free Gemini API key
 
-- Python 3.10+
-- A free Google Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+Create a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-### 2. Create and activate a virtual environment
+### 2. Run the server
 
+**Windows** — double-click `start.bat`, or from a terminal:
+```bat
+start.bat [GEMINI_API_KEY]
+```
+
+**macOS** — first make the scripts executable (one-time step):
 ```bash
-python -m venv venv
-
-# Windows (Git Bash / PowerShell)
-source venv/Scripts/activate   # Git Bash
-.\venv\Scripts\Activate.ps1    # PowerShell
-
-# macOS / Linux
-source venv/bin/activate
+chmod +x start.command start.sh
 ```
-
-### 3. Install dependencies
-
+Then double-click `start.command` in Finder, or from a terminal:
 ```bash
-pip install -r requirements.txt
+bash start.sh [GEMINI_API_KEY]
 ```
 
-### 4. Configure your API key
-
-Create a .env file at the root of this repository and copy the free Google Gemini API key you generated from [Google AI Studio](https://aistudio.google.com/app/apikey) into the .env file.
-
-```
-# Get your free Gemini API key at https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Optional: Flask settings
-FLASK_ENV=development
-FLASK_DEBUG=1
-```
-
-
-### 5. Run the server
-
-```bash
-python app.py
-```
-
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+The launcher will prompt for your API key if you don't pass it as an argument, write it to `.env`, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 ---
 
@@ -109,3 +85,42 @@ nba-connections/
 | Schema / validation  | Pydantic v2 (structured Gemini output)                          |
 | Frontend             | Vanilla HTML/CSS/JS (no framework, no build step)               |
 
+---
+
+## Development Setup
+
+If you want to modify the code or run the server manually without the launcher scripts, you'll need Python 3.10+ and a virtual environment.
+
+### 1. Create and activate a virtual environment
+
+```bash
+python -m venv venv
+
+# Windows (Git Bash)
+source venv/Scripts/activate
+# Windows (PowerShell)
+.\venv\Scripts\Activate.ps1
+# macOS / Linux
+source venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure your API key
+
+```bash
+cp .env.example .env
+# then edit .env and replace the placeholder with your real key
+```
+
+### 4. Run directly
+
+```bash
+python app.py                          # default: http://localhost:5000
+python app.py --port 8080              # custom port
+python start.py AIzaSy...yourkey       # via launcher (writes .env automatically)
+```

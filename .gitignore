@@ -1,5 +1,6 @@
 # API keys - never commit this
 .env
+dev.env
 
 # Python
 __pycache__/
