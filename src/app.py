@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import random
+import sys
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -16,7 +17,29 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 from pydantic import BaseModel, Field
 
-load_dotenv()
+# ─────────────────────────────────────────────────────────────────────────────
+# Path helpers for PyInstaller frozen bundles
+# Must be set up before load_dotenv() so the right .env file is found.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _get_base_path() -> Path:
+    """Resources directory: sys._MEIPASS when frozen, else next to this file."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    return Path(__file__).parent
+
+
+def _get_writable_path() -> Path:
+    """Writable directory: next to the .exe when frozen, else next to this file."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+BASE_PATH = _get_base_path()
+WRITABLE_PATH = _get_writable_path()
+
+load_dotenv(WRITABLE_PATH / ".env")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Logging
@@ -29,7 +52,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=str(BASE_PATH / "templates"))
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Gemini client setup
@@ -172,7 +195,7 @@ DIFFICULTY_HEX = {1: "#f9df6d", 2: "#a0c35a", 3: "#b0c4ef", 4: "#ba81c5"}
 # Player data fetching
 # ─────────────────────────────────────────────────────────────────────────────
 
-CACHE_FILE = Path(__file__).parent / "players_cache.json"
+CACHE_FILE = WRITABLE_PATH / "players_cache.json"
 CACHE_TTL_HOURS = 24
 
 
@@ -700,4 +723,13 @@ def api_reveal():
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    import argparse as _argparse
+
+    _parser = _argparse.ArgumentParser(add_help=False)
+    _parser.add_argument("--host", default="127.0.0.1")
+    _parser.add_argument("--port", type=int, default=5000)
+    _args, _ = _parser.parse_known_args()
+
+    # Disable debug mode and reloader when running as a frozen executable
+    _debug = not getattr(sys, "frozen", False)
+    app.run(debug=_debug, use_reloader=_debug, host=_args.host, port=_args.port)

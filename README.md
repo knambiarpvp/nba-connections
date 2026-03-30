@@ -16,51 +16,41 @@ A spinoff of the NYT Connections puzzle game that uses 16 NBA players split into
 
 ## Setup
 
-### 1. Prerequisites
+### 1. Get a free Gemini API key
 
-- Python 3.10+
-- A free Google Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+Create a free key at [Google AI Studio](https://aistudio.google.com/app/apikey).
 
-### 2. Create and activate a virtual environment
+### 2. Download the latest release
 
+Go to the [Releases page](../../releases/latest) and download the zip for your platform:
+
+| File                               | Platform                          |
+| ---------------------------------- | --------------------------------- |
+| `nba-connections-windows.zip`      | Windows x86_64                    |
+| `nba-connections-macos-arm64.zip`  | macOS Apple Silicon (M1/M2/M3/M4) |
+| `nba-connections-macos-x86_64.zip` | macOS Intel                       |
+
+Unzip, then run the executable inside the folder.
+
+### 3. Run the server
+
+**Windows** — double-click `nba-connections.exe`, or from a terminal:
+```bat
+nba-connections.exe [GEMINI_API_KEY]
+```
+
+**macOS** — clear the Gatekeeper quarantine flag once after unzipping:
 ```bash
-python -m venv venv
-
-# Windows (Git Bash / PowerShell)
-source venv/Scripts/activate   # Git Bash
-.\venv\Scripts\Activate.ps1    # PowerShell
-
-# macOS / Linux
-source venv/bin/activate
+xattr -cr nba-connections/
 ```
-
-### 3. Install dependencies
-
+Then run:
 ```bash
-pip install -r requirements.txt
+./nba-connections/nba-connections [GEMINI_API_KEY]
 ```
 
-### 4. Configure your API key
+The executable will prompt for your Gemini API key if not provided, save it to `.env` next to the executable, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
-Create a .env file at the root of this repository and copy the free Google Gemini API key you generated from [Google AI Studio](https://aistudio.google.com/app/apikey) into the .env file.
-
-```
-# Get your free Gemini API key at https://aistudio.google.com/app/apikey
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# Optional: Flask settings
-FLASK_ENV=development
-FLASK_DEBUG=1
-```
-
-
-### 5. Run the server
-
-```bash
-python app.py
-```
-
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+> **Note — source launchers:** If you have Python installed, `src/start/start.bat` (Windows) and `src/start/start.command`/`src/start/start.sh` (macOS) work the same way without needing a release build. See [Development Setup](#development-setup).
 
 ---
 
@@ -88,11 +78,24 @@ Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 ```
 nba-connections/
-├── app.py                  # Flask backend — routes, nba_api fetching, Gemini integration
-├── templates/
-│   └── index.html          # Single-page frontend (HTML + CSS + JS, no build tools)
-├── requirements.txt
-├── .env                    # Your API key (create this file; gitignored)
+├── src/
+│   ├── app.py              # Flask backend — routes, nba_api fetching, Gemini integration
+│   ├── .env                # Your API key (created automatically; gitignored)
+│   ├── start/
+│   │   ├── start.py        # Cross-platform launcher (API key prompt, writes .env)
+│   │   ├── start.bat       # Windows launcher
+│   │   ├── start.sh        # macOS/Linux launcher
+│   │   └── start.command   # macOS Finder double-click launcher
+│   ├── build/
+│   │   ├── build.bat       # Windows build script (produces standalone .exe)
+│   │   ├── build.sh        # macOS/Linux build script
+│   │   ├── nba_connections.spec  # PyInstaller spec file
+│   │   └── requirements.txt
+│   └── templates/
+│       └── index.html      # Single-page frontend (HTML + CSS + JS, no build tools)
+├── .github/
+│   └── workflows/
+│       └── release.yml     # CI: builds executables and publishes GitHub Releases
 ├── .gitignore
 └── players_cache.json      # Auto-generated player data cache (gitignored)
 ```
@@ -109,3 +112,126 @@ nba-connections/
 | Schema / validation  | Pydantic v2 (structured Gemini output)                          |
 | Frontend             | Vanilla HTML/CSS/JS (no framework, no build step)               |
 
+---
+
+## CI/CD — Automated Releases
+
+Every merge to `main` triggers the [Build and Release](.github/workflows/release.yml) GitHub Actions workflow, which:
+
+1. Determines the next [semantic version](https://semver.org) from commit messages using [Conventional Commits](https://www.conventionalcommits.org)
+2. Builds executables in parallel on Windows, macOS arm64, and macOS x86_64 runners
+3. Creates a [GitHub Release](../../releases) with the new tag and attaches all three zips
+
+**Version bump rules (commit message prefix):**
+
+| Prefix                               | Bump            |
+| ------------------------------------ | --------------- |
+| `feat:`                              | Minor (`1.x.0`) |
+| `fix:`, `chore:`, etc.               | Patch (`1.0.x`) |
+| `feat!:` or `BREAKING CHANGE` footer | Major (`x.0.0`) |
+| _(anything else)_                    | Patch           |
+
+---
+
+## Building Standalone Executables (No Python Required)
+
+Use [PyInstaller](https://pyinstaller.org) to bundle Python and all dependencies into a self-contained executable that can be distributed to machines with no Python installed.
+
+### Prerequisites
+
+- Python 3.10+ and the project's virtual environment set up (see [Development Setup](#development-setup) below)
+- Dependencies installed (`pip install -r requirements.txt`)
+
+### Build
+
+**Windows** — double-click `src\build\build.bat`, or from a terminal:
+```bat
+src\build\build.bat
+```
+
+**macOS / Linux:**
+```bash
+chmod +x src/build/build.sh
+src/build/build.sh
+```
+
+The build output is placed in `dist/nba-connections/`. To distribute, zip the **entire `dist/nba-connections/` folder** — the executable plus its support files must stay together.
+
+### Running the built executable
+
+**Windows:**
+```bat
+dist\nba-connections\nba-connections.exe [GEMINI_API_KEY]
+```
+
+**macOS / Linux:**
+```bash
+./dist/nba-connections/nba-connections [GEMINI_API_KEY]
+```
+
+The executable behaves identically to `python start.py`: it prompts for your Gemini API key if not provided, writes `.env` next to the executable, and starts the server.
+
+### macOS notes
+
+- **Build platform must match target platform** — PyInstaller cannot cross-compile. Run `build.sh` on a Mac to get a macOS binary; run `build.bat` on Windows for a Windows binary.
+- **CPU architecture** — the binary only runs natively on the architecture it was built on (Intel x86_64 or Apple Silicon arm64). Build separately for each, or pass `--target-arch universal2` in the spec for a combined binary (requires Apple Silicon + Rosetta).
+- **Gatekeeper warning** — macOS will block unsigned executables downloaded from the internet. Before running, clear the quarantine flag on the unzipped folder:
+  ```bash
+  xattr -cr dist/nba-connections/
+  ```
+  Alternatively, right-click the executable in Finder and choose **Open**.
+
+> **Note:** The first build can take several minutes and produces a large folder (~150–300 MB) because it bundles a full Python runtime. Subsequent builds are faster due to caching.
+
+---
+
+## Development Setup
+
+If you want to modify the code or run the server manually without the launcher scripts, you'll need Python 3.10+ and a virtual environment.
+
+### 1. Create and activate a virtual environment
+
+```bash
+python -m venv venv
+
+# Windows (Git Bash)
+source venv/Scripts/activate
+# Windows (PowerShell)
+.\venv\Scripts\Activate.ps1
+# macOS / Linux
+source venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r src/build/requirements.txt
+```
+
+### 3. Configure your API key
+
+```bash
+# Manually create src/.env with your Gemini API key:
+echo "GEMINI_API_KEY=your_key_here" > src/.env
+```
+
+### 4. Run directly
+
+```bash
+python src/app.py                          # default: http://localhost:5000
+python src/app.py --port 8080              # custom port
+python src/start/start.py AIzaSy...yourkey       # via launcher (writes src/.env automatically)
+```
+
+Or use the shell launchers from the project root:
+
+```bash
+# macOS / Linux (one-time chmod)
+chmod +x src/start/start.sh src/start/start.command
+bash src/start/start.sh [GEMINI_API_KEY]
+```
+
+```bat
+rem Windows
+src\start\start.bat [GEMINI_API_KEY]
+```
