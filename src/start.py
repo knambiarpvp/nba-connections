@@ -27,7 +27,7 @@ def _exe_dir() -> Path:
     return Path(__file__).parent  # src/
 
 
-ENV_FILE = _exe_dir() / ".env"
+ENV_FILE = _exe_dir() / "secret" / ".env"
 APP_FILE = Path(__file__).parent / "app.py"
 
 
@@ -36,6 +36,7 @@ def write_env(api_key: str) -> None:
         "# Get your free Gemini API key at https://aistudio.google.com/app/apikey\n"
         f"GEMINI_API_KEY={api_key}\n"
     )
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
     ENV_FILE.write_text(contents, encoding="utf-8")
     print(f"  .env written to {ENV_FILE}")
 

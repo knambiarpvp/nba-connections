@@ -10,7 +10,7 @@ A spinoff of the NYT Connections puzzle game that uses 16 NBA players split into
 - **AI-generated puzzles** — Google Gemini (`gemini-2.5-flash`) analyses real player metadata (teams, college, draft class, jersey number, country, position) to create 4 groups of 4 with increasing difficulty
 - **Authentic Connections UX** — tile selection, shuffle, deselect, mistake tracking (4 lives), "One away…" hint, animated correct/incorrect feedback, end-of-game reveal
 - **Server-side validation** — puzzle answers are never sent to the browser; all guesses validated on the backend
-- **Player data cache** — NBA stats are cached locally (`players_cache.json`) for 24 hours to avoid repeated rate-limited calls to stats.nba.com
+- **Player data cache** — NBA stats are cached locally (`cache/players_cache.json`) for 24 hours to avoid repeated rate-limited calls to stats.nba.com
 
 ---
 
@@ -49,7 +49,7 @@ Then run:
 
 The `nba-connections-macos.zip` is built for **arm64**. It runs natively on Apple Silicon and automatically via Rosetta 2 on Intel Macs (no extra steps needed).
 
-The executable will prompt for your Gemini API key if not provided, save it to `.env` next to the executable, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
+The executable will prompt for your Gemini API key if not provided, save it to `secret/.env` next to the executable, and start the server. Open [http://localhost:5000](http://localhost:5000) in your browser.
 
 > **Note — source launchers:** If you have Python installed, `src/start/start.bat` (Windows) and `src/start/start.command`/`src/start/start.sh` (macOS) work the same way without needing a release build. See [Development Setup](#development-setup).
 
@@ -80,9 +80,15 @@ The executable will prompt for your Gemini API key if not provided, save it to `
 ```
 nba-connections/
 ├── src/
-│   ├── app.py              # Flask backend — routes, nba_api fetching, Gemini integration
-│   ├── start.py            # Cross-platform launcher (API key prompt, writes .env)
-│   ├── .env                # Your API key (created automatically; gitignored)
+│   ├── app.py              # Flask entry point — paths, logging, blueprint registration
+│   ├── engine.py           # Pydantic schemas, puzzle store, Gemini prompt & generation
+│   ├── players.py          # NBA API fetching, caching, player selection
+│   ├── routes.py           # Flask Blueprint — /api/generate, /api/validate, /api/reveal
+│   ├── start.py            # Cross-platform launcher (API key prompt, writes secret/.env)
+│   ├── cache/              # Auto-generated player data cache (gitignored)
+│   │   └── players_cache.json
+│   ├── secret/             # API key storage (gitignored)
+│   │   └── .env            # Created automatically on first run
 │   ├── start/
 │   │   ├── start.bat       # Windows launcher
 │   │   ├── start.sh        # macOS/Linux launcher
@@ -97,8 +103,7 @@ nba-connections/
 ├── .github/
 │   └── workflows/
 │       └── release.yml     # CI: builds executables and publishes GitHub Releases
-├── .gitignore
-└── players_cache.json      # Auto-generated player data cache (gitignored)
+└── .gitignore
 ```
 
 ---
@@ -170,7 +175,7 @@ dist\nba-connections\nba-connections.exe [GEMINI_API_KEY]
 ./dist/nba-connections/nba-connections [GEMINI_API_KEY]
 ```
 
-The executable behaves identically to `python start.py`: it prompts for your Gemini API key if not provided, writes `.env` next to the executable, and starts the server.
+The executable behaves identically to `python start.py`: it prompts for your Gemini API key if not provided, writes `secret/.env` next to the executable, and starts the server.
 
 ### macOS notes
 
@@ -211,8 +216,8 @@ pip install -r src/compile/requirements.txt
 ### 3. Configure your API key
 
 ```bash
-# Manually create src/.env with your Gemini API key:
-echo "GEMINI_API_KEY=your_key_here" > src/.env
+# Manually create src/secret/.env with your Gemini API key:
+echo "GEMINI_API_KEY=your_key_here" > src/secret/.env
 ```
 
 ### 4. Run directly
@@ -220,7 +225,7 @@ echo "GEMINI_API_KEY=your_key_here" > src/.env
 ```bash
 python src/app.py                          # default: http://localhost:5000
 python src/app.py --port 8080              # custom port
-python src/start.py AIzaSy...yourkey       # via launcher (writes src/.env automatically)
+python src/start.py AIzaSy...yourkey       # via launcher (writes src/secret/.env automatically)
 ```
 
 Or use the shell launchers from the project root:
