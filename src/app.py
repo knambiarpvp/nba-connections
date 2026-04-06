@@ -91,6 +91,30 @@ class PlayerGroup(BaseModel):
     connection_explanation: str = Field(
         description="One sentence factual explanation of why these 4 players share this connection"
     )
+    connection_attribute: str = Field(
+        description=(
+            "The exact player metadata field that defines this group's connection. "
+            "Must be one of: 'teams', 'college', 'draft_year', 'draft_round', 'draft_pick', 'jersey', 'position', 'country'"
+        )
+    )
+    connection_value: str = Field(
+        description=(
+            "The minimum (or only) exact value of connection_attribute shared by all 4 players. "
+            "For exact connections: 'LAL' for teams, 'Duke' for college, '2003' for draft_year, "
+            "'23' for jersey, 'F' for position, 'Canada' for country. "
+            "For range-based numeric connections (draft_pick, draft_year), set this to the lower bound "
+            "and set connection_value_max to the upper bound."
+        )
+    )
+    connection_value_max: str = Field(
+        default="",
+        description=(
+            "Upper bound for range-based numeric connections only (draft_pick or draft_year). "
+            "Leave empty for exact-match connections. "
+            "Example: 'Top 4 draft picks' → connection_attribute='draft_pick', connection_value='1', connection_value_max='4'. "
+            "'Lottery picks (1-14)' → connection_value='1', connection_value_max='14'."
+        )
+    )
 
 
 class PuzzleResponse(BaseModel):
@@ -346,20 +370,70 @@ def enrich_with_career_teams(players: list[dict]) -> list[dict]:
             teams = []
             if season_rows["data"]:
                 sh = season_rows["headers"]
-                team_idx = sh.index("TEAM_ABBREVIATION")
+                h_map = {col: i for i, col in enumerate(sh)}
+                team_idx = h_map["TEAM_ABBREVIATION"]
+                # For career-stats totals, prefer TOT rows (traded seasons) to avoid
+                # double-counting; fall back to the single non-TOT row otherwise.
+                season_pts: dict[str, int] = {}  # season_id → pts (deduplicated)
+                season_gp: dict[str, int] = {}
                 seen: set[str] = set()
                 for sr in season_rows["data"]:
                     abbr = sr[team_idx]
-                    # TOT = stats aggregate row for a traded player; not a real team
+                    # Teams list: skip TOT placeholder
                     if abbr and abbr != "TOT" and abbr not in seen:
                         seen.add(abbr)
                         teams.append(abbr)
+                    # Career stats: use TOT rows when present to avoid double-counting
+                    sid = sr[h_map["SEASON_ID"]] if "SEASON_ID" in h_map else None
+                    if sid is not None:
+                        pts = int(sr[h_map["PTS"]] or 0) if "PTS" in h_map else 0
+                        gp = int(sr[h_map["GP"]] or 0) if "GP" in h_map else 0
+                        if abbr == "TOT" or sid not in season_pts:
+                            season_pts[sid] = pts
+                            season_gp[sid] = gp
+                player["career_pts"] = sum(season_pts.values())
+                player["career_gp"] = sum(season_gp.values())
+            else:
+                player["career_pts"] = 0
+                player["career_gp"] = 0
             if teams:
                 player["teams"] = teams
-            log.info("[enrich] %-25s teams: %s", player["name"], player["teams"])
+            log.info("[enrich] %-25s teams: %s | career: %d pts in %d gp",
+                     player["name"], player["teams"],
+                     player.get("career_pts", 0), player.get("career_gp", 0))
         except Exception as exc:
             log.warning("[enrich] Could not fetch career teams for %s: %s", player["name"], exc)
     return players
+
+
+def _pre_enrich_fame(player: dict) -> float:
+    """
+    Heuristic recognizability score using only PlayerIndex fields (no career-stats call
+    needed). Used to bias player selection toward household names before enrichment.
+    """
+    score = 1.0  # floor so every player has a positive weight
+    # Career length: more seasons → more name recognition
+    try:
+        fy = int(player.get("from_year") or 0)
+        ty = int(player.get("to_year") or 0)
+        if fy and ty:
+            score += (ty - fy) * 3.0
+    except (ValueError, TypeError):
+        pass
+    # Lottery pick: top-15 picks are usually franchise cornerstones
+    try:
+        pick = int(player.get("draft_pick") or 0)
+        if 0 < pick <= 5:
+            score += 25.0
+        elif pick <= 10:
+            score += 15.0
+        elif pick <= 15:
+            score += 8.0
+        elif pick <= 20:
+            score += 4.0
+    except (ValueError, TypeError):
+        pass
+    return score
 
 
 def select_puzzle_players(pool: str = "active", n: int = 16) -> list[dict]:
@@ -400,10 +474,37 @@ def select_puzzle_players(pool: str = "active", n: int = 16) -> list[dict]:
     chosen: list[dict] = []
     chosen_ids: set[int] = set()
 
+    # Seed the pool with a variable number of high-recognizability players so
+    # every puzzle contains well-known names without always showing the same faces.
+    fame_sorted = sorted(candidates, key=_pre_enrich_fame, reverse=True)
+    top_tier_size = random.randint(30, min(50, len(fame_sorted)))
+    top_tier = fame_sorted[:top_tier_size]
+    star_count = random.randint(3, min(9, len(top_tier)))
+    stars = random.sample(top_tier, star_count)
+    for p in stars:
+        chosen.append(p)
+        chosen_ids.add(p["id"])
+
     def pick_from(bucket: list[dict], k: int) -> list[dict]:
-        """Randomly pick up to k players from bucket that aren't already chosen."""
+        """Fame-weighted pick of up to k players from bucket that aren't already chosen."""
         available = [p for p in bucket if p["id"] not in chosen_ids]
-        picks = random.sample(available, min(k, len(available)))
+        k = min(k, len(available))
+        if k == 0:
+            return []
+        # Weighted sampling without replacement — higher fame score = more likely picked
+        weights = [_pre_enrich_fame(p) for p in available]
+        pool_pairs = list(zip(available, weights))
+        picks: list[dict] = []
+        for _ in range(k):
+            total = sum(w for _, w in pool_pairs)
+            r = random.uniform(0, total)
+            cumulative = 0.0
+            for i, (player, w) in enumerate(pool_pairs):
+                cumulative += w
+                if r <= cumulative:
+                    picks.append(player)
+                    pool_pairs.pop(i)
+                    break
         return picks
 
     # Fill 3 slots from each diverse bucket (12 total from 4 buckets)
@@ -462,6 +563,8 @@ def build_prompt(players: list[dict]) -> str:
             parts.append(f"position: {p['position']}")
         if p["country"] and p["country"] != "USA":
             parts.append(f"country: {p['country']}")
+        if p.get("career_pts"):
+            parts.append(f"career pts: {p['career_pts']}")
         lines.append(" | ".join(parts))
 
     player_block = "\n".join(lines)
@@ -487,67 +590,196 @@ The other 2 groups MUST be based on non-team attributes such as:
 Each group must share one hidden connection that is:
 - Factually accurate based ONLY on the metadata provided above — do NOT invent facts
 - Specific (e.g. "PLAYED AT DUKE" not just "SAME COLLEGE", "WORE #23" not just "SAME JERSEY")
-- Progressively harder: difficulty 1 is the most obvious, difficulty 4 is the most surprising
+- Progressively harder: difficulty 1 has the most obvious connection and should feel immediately recognisable to a casual fan; difficulty 4 is the most surprising
+- Well-known players (high career pts) may appear in any group, but the difficulty 1 group as a whole should be the most guessable connection — not necessarily the most famous individuals, but the most intuitive shared trait
 - At least one group should be a red herring — players that look like they belong elsewhere
 
 Rules:
 - Every player appears in exactly one group
 - No more than 2 of the 4 groups may be team-based connections
+- Team-based groups MUST name a specific team abbreviation (e.g. 'PLAYED FOR LAL'), NEVER a conference or region ('WESTERN CONFERENCE TEAMS' is INVALID)
 - Category names are SHORT, UPPERCASE, and punchy (2–6 words)
 - Difficulty levels 1, 2, 3, and 4 must each be used exactly once
+- Each group's connection MUST be a single, exact shared value — NEVER use "or" conditions
+  ("WORE #2 OR #5" is INVALID; "WORE #23" is VALID. "DRAFTED IN 2020" is VALID; "DRAFTED IN 2019 OR 2020" is INVALID)
+- Position groups must use a single exact position code (e.g. 'G-F'), never a combination
+- Difficulty 3 and 4 groups may include role players that only hardcore fans would recognise
+
+CRITICAL — UNIQUENESS CHECK: Before finalising, cross-check every group: verify that NONE of the 12 players outside that group also satisfy that group's connection. If even one outsider qualifies, the group is ambiguous — replace it with a tighter connection. A puzzle with interchangeable players is invalid.
+
+For each group set connection_attribute to the metadata field name (one of: 'teams', 'college', 'draft_year', 'draft_round', 'draft_pick', 'jersey', 'position', 'country') and connection_value to the exact shared value or range lower bound.
+  - For exact connections (teams, college, jersey, draft_year, draft_round, country): set connection_value to the precise value and leave connection_value_max empty.
+  - For range-based numeric connections (draft_pick, draft_year): set connection_value to the lowest qualifying number and connection_value_max to the highest (e.g. 'Top 4 draft picks' → connection_value='1', connection_value_max='4').
+  - For country groups where all 4 players share the same country, use that country name as connection_value.
+  - For country groups where the shared trait is being born outside the USA (players from different countries), use 'Non-USA' as connection_value.
+  - For position groups, use a single position letter (e.g. 'F', 'G', 'C') — a player with position 'F-C' satisfies both 'F' and 'C'.
 
 Return your answer as structured JSON."""
 
 
+_MAX_GENERATE_ATTEMPTS = 3
+
+_VALID_CONNECTION_ATTRIBUTES = frozenset(
+    {"teams", "college", "draft_year", "draft_round", "draft_pick", "jersey", "position", "country"}
+)
+
+
+def _validate_uniqueness(puzzle: PuzzleResponse, players: list[dict]) -> list[str]:
+    """
+    Check that no two players from different groups are mutually interchangeable —
+    i.e., swapping them would produce an equally valid complete solution.
+
+    A player satisfying another group's connection in isolation is fine (that's a red
+    herring). We only flag cases where player A (group X) satisfies group Y's connection
+    AND player B (group Y) simultaneously satisfies group X's connection.
+
+    Groups whose connection_attribute is missing, unrecognised, or seems hallucinated
+    (e.g. connection_value='S' for a 'teams' attribute) are silently skipped — Gemini
+    sometimes uses compound connections that don't map to a single metadata field.
+    """
+    name_to_player = {p["name"].lower(): p for p in players}
+    violations: list[str] = []
+
+    def _matches(p: dict, attr: str, val: str, val_max: str = "") -> bool:
+        if attr == "teams":
+            return val in (p.get("teams") or [])
+        if attr == "country":
+            if val.lower() in ("non-usa", "international"):
+                return p.get("country", "") not in ("", "USA")
+            return (str(p.get("country") or "")).strip().lower() == val.lower()
+        if attr == "position":
+            raw = str(p.get("position") or "")
+            parts = [pt.strip().upper() for pt in raw.split("-") if pt.strip()]
+            return val.upper() in parts or raw.upper() == val.upper()
+        if val_max:
+            try:
+                raw_int = int(str(p.get(attr) or ""))
+                return int(val) <= raw_int <= int(val_max)
+            except (ValueError, TypeError):
+                return False
+        return (str(p.get(attr) or "")).strip().lower() == val.lower()
+
+    def _group_is_checkable(attr: str, val: str, val_max: str, members: set) -> bool:
+        """Return True only when the attr/val look reliable enough to swap-check."""
+        if not attr or attr not in _VALID_CONNECTION_ATTRIBUTES:
+            return False
+        if not val:
+            return False
+        # Sanity-check: at least 3 of the 4 group members must satisfy the declared
+        # connection. If fewer do, Gemini likely hallucinated the attr/val (e.g.
+        # connection_attribute='teams', connection_value='S' for an international group).
+        qualifying = sum(
+            1 for n in members
+            if name_to_player.get(n) and _matches(name_to_player[n], attr, val, val_max)
+        )
+        return qualifying >= 3
+
+    # Build per-group metadata
+    group_info: list[tuple] = []  # (group, attr, val, val_max, member_set, checkable)
+    for group in puzzle.groups:
+        attr = (group.connection_attribute or "").strip()
+        val = (group.connection_value or "").strip()
+        val_max = (group.connection_value_max or "").strip()
+        member_lower = {n.lower() for n in group.players}
+        checkable = _group_is_checkable(attr, val, val_max, member_lower)
+        if not checkable:
+            log.debug("[validate] Skipping swap-check for '%s' (attr=%r val=%r) — compound or unverifiable connection", group.category, attr, val)
+        group_info.append((group, attr, val, val_max, member_lower, checkable))
+
+    # Mutual-swap check across all pairs of checkable groups
+    for i, (gx, ax, vx, vmx, mx, cx) in enumerate(group_info):
+        if not cx:
+            continue
+        for j, (gy, ay, vy, vmy, my, cy) in enumerate(group_info):
+            if j <= i or not cy:
+                continue
+            gx_fits_gy = [
+                name_to_player[n] for n in mx
+                if name_to_player.get(n) and _matches(name_to_player[n], ay, vy, vmy)
+            ]
+            gy_fits_gx = [
+                name_to_player[n] for n in my
+                if name_to_player.get(n) and _matches(name_to_player[n], ax, vx, vmx)
+            ]
+            for pa in gx_fits_gy:
+                for pb in gy_fits_gx:
+                    violations.append(
+                        f"'{pa['name']}' ({gx.category}) and '{pb['name']}' ({gy.category}) "
+                        f"are interchangeable: swapping them produces an alternate valid solution"
+                    )
+
+    return violations
+
+
 def generate_puzzle(players: list[dict]) -> PuzzleResponse:
-    """Call Gemini to create puzzle groups and validate the response."""
+    """Call Gemini to create puzzle groups, validate, and retry up to 3 times on failure."""
     client = get_gemini_client()
     prompt = build_prompt(players)
-
-    log.info("[gemini] Sending %d players to gemini-2.5-flash for puzzle generation ...", len(players))
-    t0 = time.time()
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-            "response_json_schema": PuzzleResponse.model_json_schema(),
-        },
-    )
-    log.info("[gemini] Response received in %.1fs. Validating ...", time.time() - t0)
-
-    puzzle = PuzzleResponse.model_validate_json(response.text)
-
-    # --- Semantic validation ---
     player_names = {p["name"] for p in players}
-    used: set[str] = set()
-    difficulties: set[int] = set()
 
-    for group in puzzle.groups:
-        if len(group.players) != 4:
-            raise ValueError(f"Group '{group.category}' has {len(group.players)} players, expected 4")
-        for pname in group.players:
-            # Allow minor name variations by checking case-insensitively
-            matched = next(
-                (n for n in player_names if n.lower() == pname.lower()), None
-            )
-            if matched is None:
-                raise ValueError(f"Player '{pname}' not in the provided player list")
-            if matched in used:
-                raise ValueError(f"Player '{matched}' appears in more than one group")
-            used.add(matched)
-        difficulties.add(group.difficulty)
+    last_error: Exception | None = None
+    for attempt in range(1, _MAX_GENERATE_ATTEMPTS + 1):
+        if attempt > 1:
+            log.warning("[gemini] Retrying puzzle generation (attempt %d/%d) ...", attempt, _MAX_GENERATE_ATTEMPTS)
 
-    if len(used) != 16:
-        raise ValueError(f"Puzzle uses {len(used)} players, expected 16")
-    if difficulties != {1, 2, 3, 4}:
-        raise ValueError(f"Difficulty levels used: {difficulties}, expected {{1,2,3,4}}")
+        log.info("[gemini] Sending %d players to gemini-2.5-flash (attempt %d) ...", len(players), attempt)
+        t0 = time.time()
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": PuzzleResponse.model_json_schema(),
+            },
+        )
+        log.info("[gemini] Response received in %.1fs. Validating ...", time.time() - t0)
 
-    log.info("[gemini] Puzzle validated OK. Groups:")
-    for g in sorted(puzzle.groups, key=lambda x: x.difficulty):
-        log.info("  [%d] %s -> %s", g.difficulty, g.category, ", ".join(g.players))
+        try:
+            puzzle = PuzzleResponse.model_validate_json(response.text)
 
-    return puzzle
+            # --- Structural validation ---
+            used: set[str] = set()
+            difficulties: set[int] = set()
+
+            for group in puzzle.groups:
+                if len(group.players) != 4:
+                    raise ValueError(f"Group '{group.category}' has {len(group.players)} players, expected 4")
+                for pname in group.players:
+                    matched = next(
+                        (n for n in player_names if n.lower() == pname.lower()), None
+                    )
+                    if matched is None:
+                        raise ValueError(f"Player '{pname}' not in the provided player list")
+                    if matched in used:
+                        raise ValueError(f"Player '{matched}' appears in more than one group")
+                    used.add(matched)
+                difficulties.add(group.difficulty)
+
+            if len(used) != 16:
+                raise ValueError(f"Puzzle uses {len(used)} players, expected 16")
+            if difficulties != {1, 2, 3, 4}:
+                raise ValueError(f"Difficulty levels used: {difficulties}, expected {{1,2,3,4}}")
+
+            # --- Uniqueness validation ---
+            violations = _validate_uniqueness(puzzle, players)
+            if violations:
+                raise ValueError(
+                    "Interchangeable players detected:\n" + "\n".join(f"  - {v}" for v in violations)
+                )
+
+            log.info("[gemini] Puzzle validated OK. Groups:")
+            for g in sorted(puzzle.groups, key=lambda x: x.difficulty):
+                log.info("  [%d] %s -> %s", g.difficulty, g.category, ", ".join(g.players))
+
+            return puzzle
+
+        except ValueError as exc:
+            log.warning("[gemini] Attempt %d validation failed: %s", attempt, exc)
+            last_error = exc
+
+    raise ValueError(
+        f"Puzzle generation failed after {_MAX_GENERATE_ATTEMPTS} attempts. Last error: {last_error}"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
