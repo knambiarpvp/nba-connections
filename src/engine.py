@@ -6,6 +6,7 @@ Pydantic schemas, puzzle store, Gemini prompt/generation, and uniqueness validat
 import logging
 import os
 import time
+from collections import Counter
 from datetime import datetime, timedelta
 
 from pydantic import BaseModel, Field
@@ -212,7 +213,8 @@ Here are 16 NBA players with their real career metadata:
 Your task: organise ALL 16 players into exactly 4 groups of 4.
 
 CRITICAL DIVERSITY RULE: You MUST use AT MOST 2 team-based connections across all 4 groups.
-The other 2 groups MUST be based on non-team attributes such as:
+Each connection_attribute may only be used ONCE across all 4 groups — you cannot have two groups both using 'draft_pick', or two groups both using 'jersey', etc.
+The remaining groups MUST be based on varied non-team attributes such as:
   - Same college / university
   - Same draft year or draft class
   - Same jersey number
@@ -396,6 +398,16 @@ def generate_puzzle(players: list[dict]) -> PuzzleResponse:
                 raise ValueError(f"Puzzle uses {len(used)} players, expected 16")
             if difficulties != {1, 2, 3, 4}:
                 raise ValueError(f"Difficulty levels used: {difficulties}, expected {{1,2,3,4}}")
+
+            # --- Attribute uniqueness: each connection_attribute used at most once ---
+            attr_counts: Counter = Counter(
+                g.connection_attribute for g in puzzle.groups if g.connection_attribute
+            )
+            dupes = [attr for attr, count in attr_counts.items() if count > 1]
+            if dupes:
+                raise ValueError(
+                    f"connection_attribute used more than once: {', '.join(dupes)}"
+                )
 
             # --- Uniqueness validation ---
             violations = _validate_uniqueness(puzzle, players)
