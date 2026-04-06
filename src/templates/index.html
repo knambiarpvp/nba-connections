@@ -441,6 +441,62 @@
             opacity: 0.85;
         }
 
+        #btn-view-solution {
+            padding: 10px 24px;
+            background: #fff;
+            color: #111;
+            border: 2px solid #111;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        #btn-view-solution:hover {
+            background: #f0f0f0;
+        }
+
+        /* ── Solution screen ─────────────────────────────────────────────────────── */
+        #solution-screen {
+            display: none;
+            width: 100%;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 24px 20px;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        #solution-screen h2 {
+            font-size: 1.3rem;
+            font-weight: 900;
+        }
+
+        #solution-rows {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #btn-back-to-results {
+            padding: 10px 24px;
+            background: #111;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+
+        #btn-back-to-results:hover {
+            opacity: 0.85;
+        }
+
         /* ── Error banner ─────────────────────────────────────────────────── */
         #error-banner {
             display: none;
@@ -545,7 +601,15 @@
             <h2 id="end-title"></h2>
             <p id="end-subtitle"></p>
             <div id="result-grid"></div>
+            <button id="btn-view-solution" onclick="showSolution()">View Solution</button>
             <button id="btn-new-game" onclick="resetToStart()">Play Again</button>
+        </div>
+
+        <!-- Solution screen -->
+        <div id="solution-screen">
+            <h2>The Solution</h2>
+            <div id="solution-rows"></div>
+            <button id="btn-back-to-results" onclick="showResults()">Back to Results</button>
         </div>
 
     </main>
@@ -840,6 +904,7 @@
                 const data = await resp.json();
                 if (data.remaining_groups) {
                     for (const group of data.remaining_groups) {
+                        solvedGroups.push(group);
                         addSolvedRow(group);
                         await delay(350);
                     }
@@ -854,6 +919,30 @@
         // ────────────────────────────────────────────────────────────────────────────
         // End screen
         // ────────────────────────────────────────────────────────────────────────────
+        function showSolution() {
+            const rows = document.getElementById('solution-rows');
+            rows.innerHTML = '';
+            const sorted = [...solvedGroups].sort((a, b) => a.difficulty - b.difficulty);
+            sorted.forEach(group => {
+                const row = document.createElement('div');
+                row.className = 'solved-row';
+                row.style.background = group.hex;
+                row.innerHTML = `
+    <div class="group-category">${escapeHtml(group.category)}</div>
+    <div class="group-players">${escapeHtml(group.players.join(' · '))}</div>
+    <div class="group-explanation">${escapeHtml(group.explanation)}</div>
+  `;
+                rows.appendChild(row);
+            });
+            document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('solution-screen').style.display = 'flex';
+        }
+
+        function showResults() {
+            document.getElementById('solution-screen').style.display = 'none';
+            document.getElementById('end-screen').style.display = 'flex';
+        }
+
         function showEndScreen(won) {
             gameOver = true;
             updateButtons();
@@ -885,6 +974,7 @@
 
         function resetToStart() {
             document.getElementById('end-screen').style.display = 'none';
+            document.getElementById('solution-screen').style.display = 'none';
             document.getElementById('game-area').style.display = 'none';
             document.getElementById('solved-rows').innerHTML = '';
             tiles = [];
